@@ -144,6 +144,19 @@ Painel contendo:
 
 ---
 
+## Modo de Teste (PMC + PMVG 2025)
+
+Nesta fase o pipeline baixa **dois universos** distintos (PMC e PMVG/PF) para 2025, respeitando a organização descrita acima:
+
+1. Cada universo possui um snippet HTML local (`pipelines/anvisa_base/tools/pmc_2025_snippet.html` e `pipelines/anvisa_base/tools/pmvg_2025_snippet.html`).
+2. O comando `python download.py` executa os dois ciclos em sequência: baixa PMC, gera um snapshot em `data/processed/pmc/`, depois repete para PMVG e salva em `data/processed/pmvg/`.
+3. Ao final o script combina as listas via chave `ANO_REF + MES_REF + REGISTRO + CÓDIGO GGREM`, criando `data/processed/anvisa/base_pmc_pmvg_unificada.csv` com todas as colunas de PF/PMVG/PMC.
+4. Os arquivos consolidados individuais continuam disponíveis para inspeção (`data/processed/anvisa/anvisa_pmvg_consolidado_temp.csv` referencia a última execução).
+
+Assim garantimos testes rápidos sem depender da página completa da Anvisa e ainda mantemos os dois recortes sincronizados para análises comparativas.
+
+---
+
 ## Estrutura do Repositório (planejada)
 
 - precfmed/
@@ -166,6 +179,8 @@ Painel contendo:
 - │ └── (em desenvolvimento)
 - ├── README.md
 - └── requirements.txt
+
+> **Status da estrutura**: os diretórios `data/raw`, `data/processed`, `src/`, `api/` e `dashboard/` já estão criados conforme o organograma acima. Os notebooks (`01_coleta.ipynb`, `02_limpeza.ipynb`, `03_analises.ipynb`) ainda são placeholders e serão adicionados quando a fase analítica iniciar.
 
 ## Contribuições
 

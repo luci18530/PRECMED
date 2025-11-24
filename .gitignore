@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+.DS_Store
+
+# Data
+data/raw/
+data/processed/
+output/
+*.csv
+*.xls
+*.xlsx
+*.zip
+*.pdf
+
+# Logs
+*.log
