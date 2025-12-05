@@ -23,8 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent
 USAR_MES_ANTERIOR = False  # True = apenas mês anterior | False = desde ANO/MES_INICIO
 
 # Data INICIAL do período (quando USAR_MES_ANTERIOR = False)
-ANO_INICIO = 2023
-MES_INICIO = 1
+ANO_INICIO = 2020
+MES_INICIO = 4
 
 # Tipo de lista alvo padrão (PMC, PMVG, PF etc.)
 TIPO_LISTA = "PMC"
@@ -49,7 +49,22 @@ else:
 # URL base do site da ANVISA para download dos arquivos
 URL_ANVISA = "https://www.gov.br/anvisa/pt-br/assuntos/medicamentos/cmed/precos/anos-anteriores/anos-anteriores"
 
+# ==============================================================================
+# ESTRATÉGIA DE COLETA (Snippets vs Scraper Dinâmico)
+# ==============================================================================
+
+# Quando True, usa scraper dinâmico para detectar automaticamente novos arquivos
+# Quando False, usa snippets HTML estáticos (legado)
+USE_DYNAMIC_SCRAPER = False  # ⚠️ Alterar para True para ativar scraper dinâmico
+
+# Ano de corte: snippets até (ano-1), scraper a partir deste ano
+SCRAPER_CUTOFF_YEAR = 2025
+
+# Diretório de cache para scraper dinâmico
+SCRAPER_CACHE_DIR = BASE_DIR.parent.parent / "data" / "cache" / "scraper"
+
 # Quando disponível, usar HTML local pré-selecionado (útil para testes controlados)
+# Usado apenas quando USE_DYNAMIC_SCRAPER = False
 USE_LOCAL_HTML_SNIPPETS = True
 LOCAL_HTML_SNIPPETS = {
    "PMC": BASE_DIR / "tools" / "snippets" / "pmc",

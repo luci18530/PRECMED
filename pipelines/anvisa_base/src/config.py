@@ -22,12 +22,13 @@ def configurar_pandas():
 # ==============================================================================
 
 # Arquivos de entrada e saída
-ARQUIVO_ENTRADA = 'data/processed/anvisa/base_anvisa_precos_vigencias.csv'
+# ATUALIZADO: Usar base unificada PMC+PMVG (tem PMC 0% e PMC 20% corretos)
+ARQUIVO_ENTRADA = 'data/processed/anvisa/base_pmc_pmvg_unificada.csv'
 ARQUIVO_SAIDA = 'output/anvisa/baseANVISA.csv'
 
 # Colunas para verificação de mudanças na unificação de vigências
 COLUNAS_VERIFICACAO_MUDANCAS = [
-    'PF 0%', 'PF 20%', 'PMVG 0%', 'PMVG 20%', 'ICMS 0%', 'CAP',
+    'PF 0%', 'PF 20%', 'PMVG 0%', 'PMVG 20%', 'PMC 0%', 'PMC 20%', 'ICMS 0%', 'CAP',
     'PRINCÍPIO ATIVO', 'LABORATÓRIO', 'PRODUTO', 'APRESENTAÇÃO',
     'CLASSE TERAPÊUTICA', 'TIPO DE PRODUTO (STATUS DO PRODUTO)', 'REGIME DE PREÇO'
 ]

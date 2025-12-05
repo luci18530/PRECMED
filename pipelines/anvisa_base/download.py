@@ -49,24 +49,51 @@ def _merge_universos(pmc_path: Path, pmvg_path: Path) -> Path:
     logging.info("[MERGE] Unificando bases PMC + PMVG...")
     pmc_df = pd.read_csv(pmc_path, sep=';', dtype=str)
     pmvg_df = pd.read_csv(pmvg_path, sep=';', dtype=str)
+    
+    # DEBUG: Mostrar colunas disponíveis
+    print(f"\n[DEBUG] Colunas PMC ({len(pmc_df.columns)}): {list(pmc_df.columns)[:15]}...")
+    print(f"[DEBUG] Colunas PMVG ({len(pmvg_df.columns)}): {list(pmvg_df.columns)[:15]}...")
+    print(f"[DEBUG] Linhas PMC: {len(pmc_df):,} | Linhas PMVG: {len(pmvg_df):,}")
 
     chaves = cfg.CHAVES_FUSAO
+    print(f"[DEBUG] Chaves de fusão: {chaves}")
+    
+    # Verificar se chaves existem em ambos
+    missing_pmc = [c for c in chaves if c not in pmc_df.columns]
+    missing_pmvg = [c for c in chaves if c not in pmvg_df.columns]
+    if missing_pmc:
+        print(f"[ERRO] Chaves faltando no PMC: {missing_pmc}")
+    if missing_pmvg:
+        print(f"[ERRO] Chaves faltando no PMVG: {missing_pmvg}")
     
     # Selecionar apenas colunas PMC 0% e 20%
     pmc_cols_preferidas = ["PMC 0%", "PMC 20%"]
-    
-    # Verificar quais colunas existem no DataFrame PMC
     pmc_cols_existentes = [c for c in pmc_cols_preferidas if c in pmc_df.columns]
+    print(f"[DEBUG] Colunas PMC encontradas: {pmc_cols_existentes}")
     
     if not pmc_cols_existentes:
         logging.warning("Colunas PMC 0%/20% não encontradas; fusão seguirá sem valores PMC.")
         pmc_subset = pmc_df[chaves].drop_duplicates(subset=chaves, keep="first")
     else:
-        # Manter chaves + colunas filtradas
         cols_to_keep = chaves + pmc_cols_existentes
         pmc_subset = pmc_df[cols_to_keep].drop_duplicates(subset=chaves, keep="first")
+    
+    # Remover colunas PMC existentes do PMVG para evitar duplicação (_x, _y)
+    pmvg_cols_pmc = [c for c in pmvg_df.columns if c.startswith("PMC")]
+    if pmvg_cols_pmc:
+        print(f"[DEBUG] Removendo colunas PMC do PMVG: {pmvg_cols_pmc}")
+        pmvg_df = pmvg_df.drop(columns=pmvg_cols_pmc)
 
+    # Merge - agora sem conflito de colunas PMC
     combinado = pmvg_df.merge(pmc_subset, on=chaves, how="left")
+    
+    print(f"[DEBUG] Colunas resultado ({len(combinado.columns)}): {list(combinado.columns)}")
+    print(f"[DEBUG] Linhas resultado: {len(combinado):,}")
+    
+    # Verificar colunas PMC finais
+    pmc_final = [c for c in combinado.columns if "PMC" in c]
+    print(f"[DEBUG] Colunas PMC finais: {pmc_final}")
+    
     saida = Path(cfg.ARQUIVO_FUSAO_PMC_PMVG)
     saida.parent.mkdir(parents=True, exist_ok=True)
     combinado.to_csv(saida, sep=';', index=False)
@@ -95,6 +122,7 @@ def run() -> None:
         resultados[lista.upper()] = _run_single(lista)
 
     if {"PMC", "PMVG"}.issubset(resultados.keys()):
+        # Usar arquivo consolidado que tem ANO_REF, MES_REF e PMC 0%/20%
         pmc_path = resultados["PMC"]["consolidado"]
         pmvg_path = resultados["PMVG"]["consolidado"]
         _merge_universos(pmc_path, pmvg_path)

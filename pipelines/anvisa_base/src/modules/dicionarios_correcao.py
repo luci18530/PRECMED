@@ -66,8 +66,8 @@ DICIONARIO_DE_CORRECAO = {
     "HEMI HIDRATADO": "HEMI-HIDRATADO",
     "HEMIDRATADO": "HEMI-HIDRATADO",
     "HEMIIDRATADO": "HEMI-HIDRATADO",
-    "MONOIDRATADO": "MONOHIDRATADO",
-    "MONOIDRATADA": "MONOHIDRATADA",
+    "MONOIDRATADO": "",
+    "MONOIDRATADA": "",
     "TETRAIDRATADO": "TETRAHIDRATADO",
     "PENTAIDRATADO": "PENTAHIDRATADO",
     "PENTAIDRATADA": "PENTAHIDRATADA",
@@ -138,8 +138,8 @@ DICIONARIO_DE_CORRECAO = {
     "ONDANSETRONA DIHIDRATADO": "ONDANSETRONA",
     "MOXIFLOXACINO MONOHIDRATADO": "MOXIFLOXACINO",
     "MONOHIDRATADO": "",
-    "ANIDRA": "",
     "MONOHIDRATADA": "",
+    "ANIDRA": "",
     "CITALOPRAM HIDROBROMETO": "CITALOPRAM",
     "PIPERACILINA SODICA": "PIPERACILINA",
     "TAZOBACTAM SODICO": "TAZOBACTAM",
@@ -168,6 +168,18 @@ DICIONARIO_DE_CORRECAO = {
     "HEMIEPTAIDRATADO": "",
     "HEPTAHIDRATADO": "",
     "HEMIPENTAIDRATADO": "",
+    "HEPTAIDRATADO": "",
+    
+    # Correções ortográficas
+    "PERTUSIS": "PERTUSSIS",
+    
+    # Remoção de referências a portarias
+    "(PORT344/98 LISTA C1)": "",
+    "(PORT 344/98 LISTA C1)": "",
+    "(PORT 344/98 LISTA B1)": "",
+    "(PORT 344/98 LISTA B 1)": "",
+    "(PORT 344/98 LISTA C 1)": "",
+    "(PORT 344/98 LISTA C 4)": "",
 }
 
 # ==============================================================================
@@ -248,7 +260,7 @@ CORRECOES_CONTAINS = [
     ('SESQUIDRATADO', '', False),
     ('SESQUIHIDRATADO', '', False),
     ('SESQUI-HIDRATADA', '', False),
-    ('(PORT 344/98 LISTA C 1)', '', False),
+    (r'\(PORT\s*344\s*/\s*98\s+LISTA\s+[A-Z]\s*\d+\)', '', True),
     ('PENTAHIDRATADO', '', False),
     ('PENTAHIDRATADA', '', False),
     ('O%', 'O', False),

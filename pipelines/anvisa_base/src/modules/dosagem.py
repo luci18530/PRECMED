@@ -71,8 +71,9 @@ def extrair_quantidades_medicamentos(df: pd.DataFrame,
     re_qualquer_item = re.compile(tipos_item_regex, re.IGNORECASE)
 
     # --- Regras para DOSAGENS e VOLUMES ---
-    # Captura dosagens (MG, G, MCG), incluindo somas como "(50 + 12.5) MG"
-    re_dosagem = re.compile(r'((?:\(?\s*\d+(?:[.,]\d+)?\s*(?:\+\s*)?)+\)?)\s*(MG|G|MCG)\b', re.IGNORECASE)
+    # Captura dosagens simples (MG, G, MCG) - ex: "50 MG", "12.5 MG", "0,5 G"
+    # Simplificada para evitar catastrophic backtracking com quantificadores aninhados
+    re_dosagem_simples = re.compile(r'(\d+(?:[.,]\d+)?)\s*(MG|G|MCG)\b', re.IGNORECASE)
     # Captura volumes em ML
     re_ml = re.compile(r'(\d+(?:[.,]\d+)?)\s*ML\b', re.IGNORECASE)
     # Captura Unidades Internacionais (UI), tratando numeros como "25 000" e a sigla "U I"
@@ -91,22 +92,20 @@ def extrair_quantidades_medicamentos(df: pd.DataFrame,
         # --- EXTRACAO DE DOSAGENS (MG, G, MCG) ---
         total_mg = 0.0
         dosagens_encontradas = False
-        for match in re_dosagem.finditer(texto):
+        for match in re_dosagem_simples.finditer(texto):
             valor_str, unidade = match.groups()
-            # Extrai todos os numeros do trecho encontrado (para tratar somas)
-            numeros = re.findall(r'\d+(?:\.\d+)?', valor_str)
-            for num_str in numeros:
-                try:
-                    num = float(num_str)
-                    if unidade == 'G':
-                        total_mg += num * 1000.0
-                    elif unidade == 'MCG':
-                        total_mg += num / 1000.0
-                    else:  # MG
-                        total_mg += num
-                    dosagens_encontradas = True
-                except ValueError:
-                    continue
+            # Converte valor para float
+            try:
+                num = float(valor_str.replace(',', '.'))
+                if unidade == 'G':
+                    total_mg += num * 1000.0
+                elif unidade == 'MCG':
+                    total_mg += num / 1000.0
+                else:  # MG
+                    total_mg += num
+                dosagens_encontradas = True
+            except ValueError:
+                continue
         quantidade_mg = total_mg if dosagens_encontradas else np.nan
 
         # Tratamento especial para BISNAGA

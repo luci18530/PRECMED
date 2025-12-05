@@ -6,10 +6,63 @@ Responsável por padronizar as colunas GGREM e EAN.
 import pandas as pd
 import sys
 import os
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 # Adicionar src ao path para importar config
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import COLUNAS_EAN
+
+
+def criar_vigencias_de_ano_mes(df):
+    """
+    Cria colunas VIG_INICIO e VIG_FIM a partir de ANO_REF e MES_REF.
+    Também cria id_produto e id_preco para compatibilidade.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame com colunas ANO_REF e MES_REF
+        
+    Returns:
+        pandas.DataFrame: DataFrame com colunas de vigência adicionadas
+    """
+    print("\n[INFO] Detectado formato ANO_REF/MES_REF (base unificada PMC+PMVG)")
+    print("[INFO] Criando colunas de vigência para compatibilidade...")
+    
+    df = df.copy()
+    
+    # Criar VIG_INICIO (primeiro dia do mês)
+    df['VIG_INICIO'] = pd.to_datetime(
+        df['ANO_REF'].astype(str) + '-' + 
+        df['MES_REF'].astype(str).str.zfill(2) + '-01'
+    )
+    
+    # Criar VIG_FIM (último dia do mês)
+    df['VIG_FIM'] = df['VIG_INICIO'] + pd.offsets.MonthEnd(0)
+    
+    # Criar id_produto (CODIGO_GGREM serve como identificador único do produto)
+    if 'CÓDIGO GGREM' in df.columns:
+        df['id_produto'] = df['CÓDIGO GGREM'].astype(str)
+    else:
+        # Fallback: usar combinação de colunas
+        df['id_produto'] = (
+            df['REGISTRO'].astype(str) + '_' + 
+            df.get('PRODUTO', '').astype(str)
+        )
+    
+    # Criar id_preco (identificador único da linha - produto + vigência)
+    df['id_preco'] = (
+        df['id_produto'] + '_' + 
+        df['VIG_INICIO'].dt.strftime('%Y%m%d')
+    )
+    
+    # Remover colunas ANO_REF e MES_REF (não são mais necessárias após criar vigências)
+    df.drop(columns=['ANO_REF', 'MES_REF'], inplace=True)
+    
+    print(f"[OK] Criadas colunas: VIG_INICIO, VIG_FIM, id_produto, id_preco")
+    print(f"[OK] Removidas colunas: ANO_REF, MES_REF (substituídas por VIG_INICIO/VIG_FIM)")
+    print(f"[OK] Período coberto: {df['VIG_INICIO'].min()} até {df['VIG_FIM'].max()}")
+    
+    return df
 
 def padronizar_codigo_ggrem(df):
     """
@@ -82,6 +135,10 @@ def limpar_padronizar_dados(df):
     
     # Fazer uma cópia para não modificar o original
     df_limpo = df.copy()
+    
+    # Se tiver ANO_REF/MES_REF em vez de VIG_INICIO/VIG_FIM, criar as colunas
+    if 'ANO_REF' in df_limpo.columns and 'VIG_INICIO' not in df_limpo.columns:
+        df_limpo = criar_vigencias_de_ano_mes(df_limpo)
     
     # Padronizar GGREM
     df_limpo = padronizar_codigo_ggrem(df_limpo)

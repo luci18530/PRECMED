@@ -41,6 +41,15 @@ logging.info(
 )
 
 # ==============================================================================
+#      MAPEAMENTO DE LINKS ESPECIAIS (GAMBIARRAS)
+# ==============================================================================
+# Alguns meses têm URLs diferentes/bugadas no site da Anvisa
+# Mapeamento: (ano, mes, tipo) -> URL correta
+LINKS_ESPECIAIS = {
+    (2021, 5, 'PMC'): 'https://www.gov.br/anvisa/pt-br/assuntos/medicamentos/cmed/precos/arquivos/xls_conformidade_site_20210508_083345464_v3.xls/@@download/file',
+}
+
+# ==============================================================================
 #      FUNÇÕES DO PIPELINE
 # ==============================================================================
 
@@ -113,12 +122,13 @@ def scrape_anvisa_links(html_content: str | bytes | None = None):
             continue
         
         href = node.get("href", "").strip()
+        
         if not href or "_reso_" in href.lower():
             continue
         
         # Ignorar explicitamente arquivos de resolução (RES06 etc) se não forem o alvo
         if "reso" in href.lower() and "xls" in href.lower():
-             continue
+            continue
 
         txt_upper = node.get_text(" ", strip=True).upper()
         if "XLS" not in txt_upper:
@@ -126,16 +136,21 @@ def scrape_anvisa_links(html_content: str | bytes | None = None):
 
         href_l = href.lower()
         if not any(token in href_l for token in conformidade_tokens):
-            if not href_l.endswith("json-file-1") or not href_l.split("/")[-1].startswith("5"):
+            # Aceitar links genéricos json-file-1 (comum em 2020-2021)
+            if not href_l.endswith("json-file-1"):
                 continue
 
         if tipo_lista:
             if ctx_tipo and ctx_tipo != tipo_lista:
                 continue
-            tokens_tipo = href_tokens_por_tipo.get(tipo_lista, tuple())
-            tipo_ok = any(token in href_l for token in tokens_tipo) or tipo_lista in txt_upper
-            if not tipo_ok and ctx_tipo is None:
-                continue
+            
+            # Para links genéricos json-file-1, aceitar se não há ctx_tipo definido
+            # (assume que estão no tipo correto se não há seção identificada)
+            if not href_l.endswith("json-file-1"):
+                tokens_tipo = href_tokens_por_tipo.get(tipo_lista, tuple())
+                tipo_ok = any(token in href_l for token in tokens_tipo) or tipo_lista in txt_upper
+                if not tipo_ok and ctx_tipo is None:
+                    continue
 
         ano = mes = None
         for rx in (rx_full, rx_mid, rx_short):
@@ -143,8 +158,37 @@ def scrape_anvisa_links(html_content: str | bytes | None = None):
             if mm:
                 ano, mes = int(mm.group(1)), int(mm.group(2))
                 break
+        
+        # Se não extraiu data do href, buscar no contexto imediato
         if not (ano and mes):
-            ano, mes = ctx_year, ctx_month
+            # Buscar texto imediatamente anterior ao link (previous_sibling)
+            prev_text = ""
+            current = node
+            
+            # Percorrer irmãos anteriores para encontrar texto
+            for i in range(10):  # Limite de 10 irmãos
+                if not current.previous_sibling:
+                    break
+                    
+                current = current.previous_sibling
+                
+                if isinstance(current, NavigableString):
+                    text_part = current.strip()
+                    prev_text = text_part + " " + prev_text
+                    
+                    # Se achou um padrão de mês/ano, usar ele
+                    m = rx_mesctx.search(prev_text.lower())
+                    if m:
+                        mes = meses_map.get(m.group(1).lower().replace('ç', 'c'))
+                        ano = normalize_year(m.group(2))
+                        break
+                elif hasattr(current, 'name') and current.name == 'a':
+                    # Se encontrou outro link, parar (não queremos pegar a data de outro link)
+                    break
+                    
+            # Se ainda não achou, usar contexto global
+            if not (ano and mes):
+                ano, mes = ctx_year, ctx_month
 
         if ano and mes:
             dados.append({"ano": ano, "mes": mes, "mes_nome": month_name(mes), "url": href})
@@ -171,9 +215,17 @@ def download_files(df_to_download):
         if dest.exists():
             return f"✓ já existe: {dest.relative_to(BASE_FOLDER)}"
         
+        # Verificar se existe link especial para este mês (gambiarra para links bugados)
+        tipo_lista = (cfg.TIPO_LISTA or "").strip().upper()
+        link_especial = LINKS_ESPECIAIS.get((ano_cal, mes_cal, tipo_lista))
+        url_download = link_especial if link_especial else row.url
+        
+        if link_especial:
+            logging.info(f"Usando link especial para {mes_cal:02d}/{ano_cal} ({tipo_lista})")
+        
         for attempt in range(4):
             try:
-                r = session.get(row.url, stream=True, timeout=30)
+                r = session.get(url_download, stream=True, timeout=30)
                 r.raise_for_status()
                 with open(dest, "wb") as f:
                     for chunk in r.iter_content(1024 * 128):
@@ -181,7 +233,7 @@ def download_files(df_to_download):
                 return f"✓ ok ({attempt+1}): {dest.relative_to(BASE_FOLDER)}"
             except requests.RequestException:
                 time.sleep(5)
-        return f"✗ falhou: {row.url.split('/')[-1]}"
+        return f"✗ falhou: {url_download.split('/')[-1]}"
 
     BASE_FOLDER.mkdir(exist_ok=True)
     logging.info(f"Iniciando downloads em {cfg.MAX_DOWNLOAD_WORKERS} threads...")
@@ -307,7 +359,14 @@ def consolidate_cleaned_files(source_folder, output_file):
         return None
 
     logging.info("Concatenando bases...")
-    df_consolidado = pd.concat(dfs, ignore_index=True, sort=False).dropna(how="all")
+    df_consolidado = pd.concat(dfs, ignore_index=True, sort=False)
+    
+    # Limpar memória imediatamente
+    del dfs
+    import gc
+    gc.collect()
+    
+    df_consolidado = df_consolidado.dropna(how="all")
     df_consolidado = df_consolidado.dropna(subset=['PRODUTO', 'PRINCÍPIO ATIVO'])
     df_consolidado.to_csv(output_file, sep=";", index=False)
     logging.info(f"Consolidação concluída. Arquivo salvo em: {os.path.abspath(output_file)}")
@@ -316,7 +375,10 @@ def consolidate_cleaned_files(source_folder, output_file):
 def process_vigencias(df_consolidado):
     """Processa o dataframe consolidado para criar a tabela final de vigências."""
     logging.info("Iniciando fase de consolidação de vigências...")
-    df = df_consolidado.copy()
+    
+    # IMPORTANTE: Não fazer .copy() para economizar memória
+    # Vamos trabalhar diretamente com o DataFrame original
+    df = df_consolidado
 
     # PASSO 1: Preparação
     # Remover linhas com ANO_REF ou MES_REF inválidos
@@ -352,7 +414,13 @@ def process_vigencias(df_consolidado):
 
     # PASSO 3: Construção de Vigências
     logging.info("Construindo tabela de vigências...")
-    df_vigencias = df[inicio_vigencia].copy()
+    
+    # Em vez de copiar todo o DataFrame filtrado de uma vez, 
+    # vamos trabalhar com índices e depois selecionar apenas o necessário
+    indices_vigencia = df.index[inicio_vigencia].tolist()
+    
+    # Criar DataFrame menor apenas com índices necessários
+    df_vigencias = df.loc[indices_vigencia, :].copy(deep=False)  # shallow copy
     df_vigencias['VIG_INICIO'] = df_vigencias['DATA_REF']
     df_vigencias['VIG_FIM'] = df_vigencias.groupby('id_produto')['VIG_INICIO'].shift(-1) - pd.Timedelta(days=1)
 
@@ -388,12 +456,22 @@ def process_vigencias(df_consolidado):
     # PASSO 6: Padronização de atributos
     logging.info("Padronizando atributos de texto pela última vigência...")
     cols_to_standardize = ['PRINCÍPIO ATIVO', 'LABORATÓRIO', 'PRODUTO', 'APRESENTAÇÃO', 'CLASSE TERAPÊUTICA', 'TIPO DE PRODUTO (STATUS DO PRODUTO)', 'REGIME DE PREÇO']
-    latest_data = df_vigencias_final.sort_values('VIG_INICIO').drop_duplicates(subset='id_produto', keep='last').set_index('id_produto')
+    
+    # Processar em chunks para economizar memória
+    latest_data = df_vigencias_final.sort_values('VIG_INICIO').drop_duplicates(subset='id_produto', keep='last')[['id_produto'] + [c for c in cols_to_standardize if c in df_vigencias_final.columns]]
+    latest_data.set_index('id_produto', inplace=True)
+    
     for col in [c for c in cols_to_standardize if c in df_vigencias_final.columns]:
         df_vigencias_final[col] = df_vigencias_final['id_produto'].map(latest_data[col])
         
-    for col in df_vigencias_final.select_dtypes(include=['object']).columns:
-        df_vigencias_final[col] = df_vigencias_final[col].str.upper()
+    # Converter para maiúsculas apenas colunas de texto, e fazer em chunks
+    text_cols = df_vigencias_final.select_dtypes(include=['object']).columns.tolist()
+    chunk_size = 100000
+    for i in range(0, len(df_vigencias_final), chunk_size):
+        end_idx = min(i + chunk_size, len(df_vigencias_final))
+        for col in text_cols:
+            df_vigencias_final.loc[df_vigencias_final.index[i:end_idx], col] = \
+                df_vigencias_final.loc[df_vigencias_final.index[i:end_idx], col].str.upper()
 
     # PASSO 7: Remoção de duplicatas
     logging.info("Removendo duplicatas da chave final...")
@@ -401,6 +479,10 @@ def process_vigencias(df_consolidado):
     df_vigencias_final.sort_values(by=['id_produto', 'VIG_INICIO', 'quality_score'], ascending=[True, True, False], inplace=True)
     df_vigencias_final.drop_duplicates(subset=['id_produto', 'VIG_INICIO'], keep='first', inplace=True)
     df_vigencias_final.drop(columns=['quality_score'], inplace=True)
+    
+    # Liberar memória
+    import gc
+    gc.collect()
     
     return df_vigencias_final
 

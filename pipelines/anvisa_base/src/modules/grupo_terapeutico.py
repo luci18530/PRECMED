@@ -222,7 +222,10 @@ def mapear_grupos_terapeuticos(df, df_grupos, criar_debug: bool = False):
     if 'CLASSE_TERAPEUTICA_NORMALIZADA' in df.columns:
         df = df.drop(columns=['CLASSE_TERAPEUTICA_NORMALIZADA'])
     
+    # Remover a coluna antiga CLASSE TERAPEUTICA antes de renomear para evitar duplicatas
     if 'CLASSE_TERAPEUTICA_AJUSTADA' in df.columns:
+        if 'CLASSE TERAPEUTICA' in df.columns:
+            df = df.drop(columns=['CLASSE TERAPEUTICA'])
         df = df.rename(columns={'CLASSE_TERAPEUTICA_AJUSTADA': 'CLASSE TERAPEUTICA'})
     
     print("[OK] Colunas de classe terapeutica atualizadas.")
