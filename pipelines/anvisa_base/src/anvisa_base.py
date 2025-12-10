@@ -26,13 +26,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 OUTPUT_DIR = PROJECT_ROOT / "output"
 DATA_DIR = PROJECT_ROOT / "data"
 
-# Prioridade de busca para o CSV da base ANVISA:
-# 1. Base PROCESSADA FINAL em output/anvisa/ (10 etapas, com ID_CMED_PRODUTO)
-# 2. Base RAW consolidada em data/processed/anvisa/ (só consolidação, sem processamento)
-# 3. Base legada em output/ (formato muito antigo)
-ANVISA_PROCESSED_CSV = OUTPUT_DIR / "anvisa" / "baseANVISA.csv"  # PRIORIDADE 1 - Base processada (312k registros)
-ANVISA_RAW_CSV = DATA_DIR / "processed" / "anvisa" / "base_anvisa_precos_vigencias.csv"  # PRIORIDADE 2 - Base raw (493k)
-ANVISA_LEGACY_CSV = OUTPUT_DIR / "baseANVISA.csv"  # PRIORIDADE 3 - Legado
+# Entrada única obrigatória para este pipeline (base com vigências já calculadas)
+# PRIORIDADE: base unificada completa (PMC+PMVG+PF com vigências)
+ANVISA_INPUT_CSV = DATA_DIR / "processed" / "anvisa" / "base_pmc_pmvg_unificada.csv"
+
+# Fallback: base só PMVG com vigências
+ANVISA_INPUT_FALLBACK = DATA_DIR / "processed" / "anvisa" / "base_anvisa_precos_vigencias.csv"
+
+# Saída processada final
+ANVISA_PROCESSED_CSV = OUTPUT_DIR / "anvisa" / "baseANVISA.csv"
 
 # Arquivos de tipos de dados
 ANVISA_CANON_DTYPES = OUTPUT_DIR / "anvisa" / "baseANVISA_dtypes.json"
@@ -40,31 +42,22 @@ ANVISA_LEGACY_DTYPES = OUTPUT_DIR / "baseANVISA_dtypes.json"
 
 
 def _resolver_caminho_csv() -> Path:
-    """
-    Resolve o caminho do CSV da base ANVISA com prioridade CORRETA:
-    1. Base PROCESSADA em output/anvisa/ (312k registros, 10 etapas, com ID_CMED_PRODUTO)
-    2. Base RAW consolidada em data/processed/anvisa/ (493k registros, só consolidação)
-    3. Base legada em output/
-    """
-    # PRIORIDADE 1: Base processada final (output/anvisa/baseANVISA.csv)
-    if ANVISA_PROCESSED_CSV.exists():
-        print(f"[INFO] Usando base PROCESSADA (10 etapas): {ANVISA_PROCESSED_CSV}")
-        return ANVISA_PROCESSED_CSV
+    """Retorna o caminho da base ANVISA para processamento (prioridade: base completa unificada)."""
+    # PRIORIDADE 1: Base unificada completa (PMC+PMVG+PF com vigências)
+    if ANVISA_INPUT_CSV.exists():
+        print(f"[INFO] Usando base unificada completa: {ANVISA_INPUT_CSV}")
+        return ANVISA_INPUT_CSV
     
-    # PRIORIDADE 2: Base raw consolidada (fallback se não tiver processado)
-    if ANVISA_RAW_CSV.exists():
-        print(f"[AVISO] Usando base RAW (só consolidação): {ANVISA_RAW_CSV}")
-        print(f"[AVISO] Para melhor matching, execute: python pipelines/anvisa_base/src/processar_dados.py")
-        return ANVISA_RAW_CSV
-    
-    # PRIORIDADE 3: Base legada
-    if ANVISA_LEGACY_CSV.exists():
-        print(f"[AVISO] Usando base legada em output/: {ANVISA_LEGACY_CSV}")
-        print("[AVISO] Considere mover para output/anvisa/")
-        return ANVISA_LEGACY_CSV
-    
-    # Se nenhum existe, retornar o caminho preferencial para mensagem de erro clara
-    return ANVISA_PROCESSED_CSV
+    # FALLBACK: Base só PMVG com vigências
+    if ANVISA_INPUT_FALLBACK.exists():
+        print(f"[AVISO] Base unificada não encontrada, usando fallback (só PMVG): {ANVISA_INPUT_FALLBACK}")
+        return ANVISA_INPUT_FALLBACK
+
+    # Nenhuma entrada disponível -> mensagem clara
+    print(f"[ERRO] Nenhuma base de entrada encontrada.")
+    print(f"[ERRO] Esperado: {ANVISA_INPUT_CSV}")
+    print(f"[ERRO] Ou fallback: {ANVISA_INPUT_FALLBACK}")
+    return ANVISA_INPUT_CSV
 
 
 def _resolver_caminho(preferencial: Path, legado: Path, aviso: str) -> Path:
@@ -164,21 +157,85 @@ def carregar_base_anvisa(dtypes):
     print(f"\n[INFO] Carregando CSV de: {csv_path}")
     print("[INFO] Aguarde, este processo pode demorar...")
     
-    # Detectar separador (pode ser ; ou \t)
+    # Detectar separador (pode ser ; ou \t) e colunas presentes no header
     with open(csv_path, 'r', encoding='utf-8') as f:
         primeira_linha = f.readline()
         separador = ';' if ';' in primeira_linha else '\t'
+        header_cols = [c.strip() for c in primeira_linha.strip().split(separador)]
     print(f"[INFO] Separador detectado: '{separador}'")
-    
+
+    # Garantir que só passamos colunas existentes para dtype e parse_dates
+    dtype_cols_present = {c: t for c, t in dtype_cols.items() if c in header_cols}
+    missing_for_dtype = sorted(set(dtype_cols) - set(dtype_cols_present))
+    if missing_for_dtype:
+        print(f"[AVISO] Tipos ignorados (coluna ausente no CSV): {missing_for_dtype}")
+
+    parse_dates_present = [c for c in parse_dates_cols if c in header_cols]
+    missing_parse_dates = sorted(set(parse_dates_cols) - set(parse_dates_present))
+    if missing_parse_dates:
+        print(f"[AVISO] Colunas de data ausentes e ignoradas: {missing_parse_dates}")
+
     dfpre = pd.read_csv(
         csv_path,
         sep=separador,
-        dtype=dtype_cols,
-        parse_dates=parse_dates_cols,
+        dtype=dtype_cols_present,
+        parse_dates=parse_dates_present,
         na_values=['', ' ', 'nan', 'NaN']
     )
     
     print(f"[OK] Base ANVISA carregada: {len(dfpre):,} registros, {len(dfpre.columns)} colunas")
+    
+    # PADRONIZAR NOMES DE COLUNAS (remover acentos para compatibilidade com módulos)
+    print("\n[INFO] Padronizando nomes de colunas (removendo acentos)...")
+    colunas_renomear = {
+        'PRINCÍPIO ATIVO': 'PRINCIPIO ATIVO',
+        'LABORATÓRIO': 'LABORATORIO',
+        'APRESENTAÇÃO': 'APRESENTACAO',
+        'CÓDIGO GGREM': 'CODIGO GGREM'
+    }
+    
+    colunas_renomeadas = []
+    for col_antiga, col_nova in colunas_renomear.items():
+        if col_antiga in dfpre.columns:
+            dfpre.rename(columns={col_antiga: col_nova}, inplace=True)
+            colunas_renomeadas.append(f"{col_antiga} → {col_nova}")
+    
+    if colunas_renomeadas:
+        print("[OK] Colunas padronizadas:")
+        for renomeacao in colunas_renomeadas:
+            print(f"  - {renomeacao}")
+    
+    # Se não tem VIG_INICIO mas tem ANO_REF/MES_REF, criar vigências
+    if 'VIG_INICIO' not in dfpre.columns and 'ANO_REF' in dfpre.columns:
+        print("\n[INFO] Detectado formato ANO_REF/MES_REF (base unificada sem vigências)")
+        print("[INFO] Criando colunas VIG_INICIO, VIG_FIM, id_produto, id_preco...")
+        
+        # Criar VIG_INICIO (primeiro dia do mês)
+        dfpre['VIG_INICIO'] = pd.to_datetime(
+            dfpre['ANO_REF'].astype(str) + '-' + 
+            dfpre['MES_REF'].astype(str).str.zfill(2) + '-01'
+        )
+        
+        # Criar VIG_FIM (último dia do mês)
+        dfpre['VIG_FIM'] = dfpre['VIG_INICIO'] + pd.offsets.MonthEnd(0)
+        
+        # Criar id_produto (combinação REGISTRO + CÓDIGO GGREM)
+        dfpre['id_produto'] = (
+            dfpre['REGISTRO'].astype(str).str.strip() + '-' +
+            dfpre['CÓDIGO GGREM'].astype(str).str.strip()
+        )
+        
+        # Criar id_preco (produto + vigência)
+        dfpre['id_preco'] = (
+            dfpre['id_produto'] + '_' +
+            dfpre['VIG_INICIO'].dt.strftime('%Y%m%d')
+        )
+        
+        # Remover ANO_REF e MES_REF (substituídos por vigências)
+        dfpre.drop(columns=['ANO_REF', 'MES_REF'], inplace=True)
+        
+        print(f"[OK] Vigências criadas: {dfpre['VIG_INICIO'].min()} até {dfpre['VIG_FIM'].max()}")
+        print(f"[OK] {dfpre['id_produto'].nunique():,} produtos únicos identificados")
     
     return dfpre
 

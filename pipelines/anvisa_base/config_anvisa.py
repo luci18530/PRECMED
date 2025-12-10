@@ -55,7 +55,7 @@ URL_ANVISA = "https://www.gov.br/anvisa/pt-br/assuntos/medicamentos/cmed/precos/
 
 # Quando True, usa scraper dinâmico para detectar automaticamente novos arquivos
 # Quando False, usa snippets HTML estáticos (legado)
-USE_DYNAMIC_SCRAPER = False  # ⚠️ Alterar para True para ativar scraper dinâmico
+USE_DYNAMIC_SCRAPER = True  # Usar scraper dinâmico primeiro; snippets são fallback
 
 # Ano de corte: snippets até (ano-1), scraper a partir deste ano
 SCRAPER_CUTOFF_YEAR = 2025

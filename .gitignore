@@ -20,5 +20,9 @@ output/
 *.zip
 *.pdf
 
+# Parquet
+*.parquet
+data/cache/dashboard/*.parquet
+
 # Logs
 *.log

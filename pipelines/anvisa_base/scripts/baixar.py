@@ -4,6 +4,8 @@ Script automatizado para baixar, limpar e processar as listas de preços de medi
 """
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 from bs4.element import Tag, NavigableString
 import re
@@ -200,6 +202,17 @@ def scrape_anvisa_links(html_content: str | bytes | None = None):
 def download_files(df_to_download):
     """Baixa os arquivos de uma lista de links em paralelo."""
     session = requests.Session()
+
+    # Reuso de conexões e retentativas com backoff evitam travamentos em rodadas longas
+    retry_cfg = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retry_cfg)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
     session.headers.update({"User-Agent": "Python Automated Downloader"})
     BASE_FOLDER = Path(cfg.PASTA_DOWNLOADS_BRUTOS)
 
@@ -212,7 +225,7 @@ def download_files(df_to_download):
         nome = f"{ano_cal}_{mes_cal:02d}_{row.mes_nome}{ext}"
         dest = pasta / nome
 
-        if dest.exists():
+        if dest.exists() and dest.stat().st_size > 0:
             return f"✓ já existe: {dest.relative_to(BASE_FOLDER)}"
         
         # Verificar se existe link especial para este mês (gambiarra para links bugados)
@@ -258,6 +271,19 @@ def clean_downloaded_files(source_folder, target_folder):
 
     def process_single_file(file_path):
         try:
+            filename = os.path.basename(file_path)
+            try:
+                ano_ref, mes_ref = int(filename.split('_')[0]), int(filename.split('_')[1])
+            except Exception:
+                ano_ref = mes_ref = None
+
+            # Evitar retrabalho: pular se o CSV limpo já existe e é mais novo
+            if ano_ref and mes_ref:
+                output_name = f"ANVISA_LIMPO_{ano_ref}_{mes_ref:02d}.csv"
+                output_path = Path(target_folder) / output_name
+                if output_path.exists() and output_path.stat().st_mtime >= Path(file_path).stat().st_mtime:
+                    return f"SKIP: {filename} -> {output_name}"
+
             # Verificar se o arquivo é realmente Excel ou HTML corrompido
             with open(file_path, 'rb') as f:
                 header_bytes = f.read(20)
@@ -303,8 +329,8 @@ def clean_downloaded_files(source_folder, target_folder):
             header = df_preview.iloc[header_row_index].astype(str).str.strip().str.replace(r'\s+%', '%', regex=True).str.replace(r'\s+', ' ', regex=True).str.upper()
             df.columns = header
 
-            filename = os.path.basename(file_path)
-            ano_ref, mes_ref = int(filename.split('_')[0]), int(filename.split('_')[1])
+            if ano_ref is None or mes_ref is None:
+                ano_ref, mes_ref = int(filename.split('_')[0]), int(filename.split('_')[1])
             df['ANO_REF'], df['MES_REF'] = ano_ref, mes_ref
             
             cols_to_move = ['ANO_REF', 'MES_REF']
@@ -504,7 +530,7 @@ def main():
 
     # 2. Raspagem de Links
     html_override = None
-    if cfg.USE_LOCAL_HTML_SNIPPETS:
+    if not cfg.USE_DYNAMIC_SCRAPER and cfg.USE_LOCAL_HTML_SNIPPETS:
         snippet_path = cfg.LOCAL_HTML_SNIPPETS.get(cfg.TIPO_LISTA)
         if snippet_path:
             path_obj = Path(snippet_path)
@@ -535,8 +561,36 @@ def main():
         return
 
     # 3. Filtragem e Download
-    data_inicio = datetime(cfg.ANO_INICIO, cfg.MES_INICIO, 1)
-    data_fim = datetime(cfg.ANO_FIM, cfg.MES_FIM, 1)
+    if cfg.USAR_MES_ANTERIOR:
+        hoje = datetime.now()
+        mes_ref = 12 if hoje.month == 1 else hoje.month - 1
+        ano_ref = hoje.year - 1 if hoje.month == 1 else hoje.year
+        data_inicio = data_fim = datetime(ano_ref, mes_ref, 1)
+        logging.info(f"Modo mês anterior: {mes_ref:02d}/{ano_ref}")
+    else:
+        data_inicio = datetime(cfg.ANO_INICIO, cfg.MES_INICIO, 1)
+        data_fim = datetime(cfg.ANO_FIM, cfg.MES_FIM, 1)
+
+    periodos_esperados = pd.period_range(data_inicio, data_fim, freq="M")
+    pares_disponiveis = {(int(a), int(m)) for a, m in zip(df_links['ano'], df_links['mes'])}
+    faltantes = [(p.year, p.month) for p in periodos_esperados if (p.year, p.month) not in pares_disponiveis]
+    if faltantes and cfg.USE_DYNAMIC_SCRAPER:
+        logging.warning(f"Links ausentes no HTML para: {faltantes} — tentando coletar página oficial ao vivo")
+        try:
+            live_html = requests.get(cfg.URL_ANVISA, timeout=60).content
+            df_live = scrape_anvisa_links(live_html)
+            pares_live = {(int(a), int(m)) for a, m in zip(df_live['ano'], df_live['mes'])}
+            novos = pares_live - pares_disponiveis
+            if novos:
+                df_links = pd.concat([df_links, df_live]).drop_duplicates(['ano','mes']).sort_values(['ano','mes'])
+                logging.info(f"Novos períodos adicionados via live scrape: {sorted(novos)}")
+            faltantes = [(p.year, p.month) for p in periodos_esperados if (p.year, p.month) not in {(int(a), int(m)) for a, m in zip(df_links['ano'], df_links['mes'])}]
+        except Exception as e:
+            logging.error(f"Falha no live scrape: {e}")
+
+    if faltantes:
+        logging.warning(f"Ainda faltando períodos: {faltantes}")
+
     df_to_download = df_links[df_links.apply(lambda row: data_inicio <= datetime(row['ano'], row['mes'], 1) <= data_fim, axis=1)]
 
     if df_to_download.empty:

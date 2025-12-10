@@ -144,11 +144,153 @@ Painel contendo:
 
 ---
 
+## Guia de Execução
+
+### Pré-requisitos
+- Python 3.12+
+- Dependências em `requirements.txt`: `pip install -r requirements.txt`
+
+### 1. Download e Processamento da Base ANVISA
+
+#### 1.1 Baixar dados PMC + PMVG (com scraping ao vivo)
+```bash
+cd C:\Users\luciano\Desktop\Works\PORTIFOLIO\PRECMED
+C:\Python312\python.exe download.py
+```
+
+**O que acontece:**
+- Raspeia a página oficial da ANVISA (ou usa snippets locais como fallback)
+- Baixa arquivos XLS/XLSX de PMC (Preço Máximo ao Consumidor) e PMVG (Preço Máximo ao Governo)
+- Período padrão: 2020-04 até a data atual (configurável em `pipelines/anvisa_base/config_anvisa.py`)
+- Salva dados consolidados em `data/processed/anvisa/`
+
+**Arquivos gerados:**
+- `base_anvisa_precos_vigencias.csv` – base consolidada com vigências
+- `base_pmc_pmvg_unificada.csv` – fusão PMC + PMVG por período
+- `output/anvisa/baseANVISA.csv` – cópia compatível com dashboard
+
+#### 1.2 Configurar período de coleta (opcional)
+Edite `pipelines/anvisa_base/config_anvisa.py`:
+```python
+# Coleta desde 2020-04
+ANO_INICIO = 2020
+MES_INICIO = 4
+
+# Apenas mês anterior (útil para atualizações incrementais)
+USAR_MES_ANTERIOR = False  # Mude para True se quiser atualizar só o último mês
+```
+
+#### 1.3 Processar e refinar dados
+```bash
+C:\Python312\python.exe pipelines/anvisa_base/main.py
+```
+
+**O que faz:**
+- Aplica limpeza e padronização sobre a base consolidada
+- Detecta mudanças de preço e calcula vigências
+- Remove duplicatas e normaliza atributos
+- Salva resultado final em `data/processed/anvisa/base_anvisa_precos_vigencias.csv`
+
+#### 1.4 Pipeline de preparação avançada (processamento da base unificada)
+```bash
+cd C:\Users\luciano\Desktop\Works\PORTIFOLIO\PRECMED
+C:\Python312\python.exe pipelines/anvisa_base/scripts/processar_base_anvisa.py
+```
+
+**Para que serve:**
+- Carrega a base já baixada/mesclada (`data/processed/anvisa/base_pmc_pmvg_unificada.csv` — único input)
+- Aplica limpeza extra e normalização de apresentações (funções em `pipelines/anvisa_base/src/anvisa_base.py`)
+- Calcula vigências e reduz colunas originais redundantes
+- Retorna o DataFrame final (`dfpre`) pronto para análises ou integração
+
+**Entrada esperada:**
+- `data/processed/anvisa/base_pmc_pmvg_unificada.csv` (gerada pelo passo 1.1/1.3)
+
+**Saídas típicas:**
+- Gera `output/anvisa/baseANVISA.csv` como base processada final
+- Reutiliza `output/anvisa/baseANVISA_dtypes.json` para tipagem
+
+---
+
+### 2. Montar o Dashboard Streamlit
+
+#### 2.1 Preparar e validar dados
+```bash
+C:\Python312\python.exe dashboard/preprocess.py
+```
+
+**Gera:**
+- Parquet otimizado em `data/cache/dashboard/`
+- Agregações pré-calculadas
+- Índices para busca rápida
+- Metadata de períodos e produtos
+
+#### 2.2 Executar dashboard
+```bash
+C:\Python312\python.exe -m streamlit run dashboard/app.py
+```
+
+**Acesso:**
+- Abre automaticamente em `http://localhost:8501`
+- Ou manualmente: abra navegador e acesse `http://localhost:8501`
+
+**Funcionalidades:**
+- Série temporal de preços (PF, PMC, PMVG)
+- Busca por produto/princípio ativo
+- Análise de vigências
+- Comparação de períodos
+- Exportação de dados
+
+---
+
+### 3. Pipeline Completo (um comando)
+
+Para executar todo o fluxo de uma vez:
+```bash
+# 1. Download + processamento
+C:\Python312\python.exe download.py
+
+# 2. Prepara dados para dashboard
+C:\Python312\python.exe dashboard/preprocess.py
+
+# 3. Inicia dashboard
+C:\Python312\python.exe -m streamlit run dashboard/app.py
+```
+
+---
+
+## CLI - Menu inicial (rápido)
+
+Para facilitar a execução das etapas, incluímos um `cli.py` na raiz do projeto.
+Ele permite executar as etapas do pipeline via menu interativo ou flags:
+
+Exemplos de uso:
+
+```powershell
+# Menu interativo
+python cli.py
+
+# Só download (PMC + PMVG)
+python cli.py --download
+
+# Só processamento (pipeline completo)
+python cli.py --process
+
+# Dashboard: preprocess + start Streamlit
+python cli.py --dashboard start
+
+# Executa tudo: download -> process -> dashboard preprocess
+python cli.py --all
+```
+
+O CLI é uma camada de conveniência que invoca os scripts já existentes (download, processar_base_anvisa, dashboard/preprocess) garantindo um fluxo unificado.
+
+
 ## Modo de Teste (PMC + PMVG 2025)
 
 Nesta fase o pipeline baixa **dois universos** distintos (PMC e PMVG/PF) para 2025, respeitando a organização descrita acima:
 
-1. Cada universo possui um snippet HTML local (`pipelines/anvisa_base/tools/pmc_2025_snippet.html` e `pipelines/anvisa_base/tools/pmvg_2025_snippet.html`).
+1. Cada universo possui um snippet HTML local (`pipelines/anvisa_base/tools/snippets/pmc/` e `pipelines/anvisa_base/tools/snippets/pmvg/`).
 2. O comando `python download.py` executa os dois ciclos em sequência: baixa PMC, gera um snapshot em `data/processed/pmc/`, depois repete para PMVG e salva em `data/processed/pmvg/`.
 3. Ao final o script combina as listas via chave `ANO_REF + MES_REF + REGISTRO + CÓDIGO GGREM`, criando `data/processed/anvisa/base_pmc_pmvg_unificada.csv` com todas as colunas de PF/PMVG/PMC.
 4. Os arquivos consolidados individuais continuam disponíveis para inspeção (`data/processed/anvisa/anvisa_pmvg_consolidado_temp.csv` referencia a última execução).

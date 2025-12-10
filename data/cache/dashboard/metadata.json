@@ -1,0 +1,384 @@
+{
+  "gerado_em": "2025-12-05T12:31:12.440593",
+  "arquivo_fonte": "C:\\Users\\luciano\\Desktop\\Works\\PORTIFOLIO\\PRECMED\\output\\anvisa\\baseANVISA.csv",
+  "total_registros": 1083561,
+  "total_produtos_unicos": 38234,
+  "total_periodos": 67,
+  "periodo_inicio": "2020-04",
+  "periodo_fim": "2025-10",
+  "colunas": [
+    "PRINCIPIO ATIVO",
+    "LABORATORIO",
+    "CÓDIGO GGREM",
+    "REGISTRO",
+    "EAN 1",
+    "EAN 2",
+    "EAN 3",
+    "PRODUTO",
+    "APRESENTACAO_ORIGINAL",
+    "STATUS",
+    "REGIME DE PREÇO",
+    "PF 0%",
+    "PF 20%",
+    "PMVG 0%",
+    "PMVG 20%",
+    "ICMS 0%",
+    "CAP",
+    "PMC 0%",
+    "PMC 20%",
+    "VIG_INICIO",
+    "ID_PRODUTO",
+    "ID_PRECO",
+    "VIG_FIM",
+    "CLASSE_TERAPEUTICA_ORIGINAL",
+    "GRUPO ANATOMICO",
+    "PRINCIPIO_ATIVO_ORIGINAL",
+    "PRODUTO_ORIGINAL",
+    "SUBSTANCIA_COMPOSTA",
+    "TIPO DE PRODUTO",
+    "QUANTIDADE UNIDADES",
+    "QUANTIDADE MG",
+    "QUANTIDADE ML",
+    "QUANTIDADE UI",
+    "LABORATORIO_ORIGINAL",
+    "CLASSE TERAPEUTICA",
+    "GRUPO TERAPEUTICO"
+  ],
+  "periodos": [
+    {
+      "ano": 2020,
+      "mes": 4,
+      "registros": 22956
+    },
+    {
+      "ano": 2020,
+      "mes": 5,
+      "registros": 7064
+    },
+    {
+      "ano": 2020,
+      "mes": 6,
+      "registros": 22880
+    },
+    {
+      "ano": 2020,
+      "mes": 7,
+      "registros": 7037
+    },
+    {
+      "ano": 2020,
+      "mes": 8,
+      "registros": 7540
+    },
+    {
+      "ano": 2020,
+      "mes": 9,
+      "registros": 23872
+    },
+    {
+      "ano": 2020,
+      "mes": 10,
+      "registros": 8939
+    },
+    {
+      "ano": 2020,
+      "mes": 11,
+      "registros": 7538
+    },
+    {
+      "ano": 2020,
+      "mes": 12,
+      "registros": 8928
+    },
+    {
+      "ano": 2021,
+      "mes": 1,
+      "registros": 25905
+    },
+    {
+      "ano": 2021,
+      "mes": 2,
+      "registros": 25988
+    },
+    {
+      "ano": 2021,
+      "mes": 3,
+      "registros": 25669
+    },
+    {
+      "ano": 2021,
+      "mes": 4,
+      "registros": 24338
+    },
+    {
+      "ano": 2021,
+      "mes": 5,
+      "registros": 25791
+    },
+    {
+      "ano": 2021,
+      "mes": 6,
+      "registros": 25963
+    },
+    {
+      "ano": 2021,
+      "mes": 7,
+      "registros": 26061
+    },
+    {
+      "ano": 2021,
+      "mes": 8,
+      "registros": 7695
+    },
+    {
+      "ano": 2021,
+      "mes": 9,
+      "registros": 7406
+    },
+    {
+      "ano": 2021,
+      "mes": 10,
+      "registros": 7701
+    },
+    {
+      "ano": 2021,
+      "mes": 11,
+      "registros": 8396
+    },
+    {
+      "ano": 2021,
+      "mes": 12,
+      "registros": 8204
+    },
+    {
+      "ano": 2022,
+      "mes": 1,
+      "registros": 8009
+    },
+    {
+      "ano": 2022,
+      "mes": 2,
+      "registros": 8283
+    },
+    {
+      "ano": 2022,
+      "mes": 3,
+      "registros": 7568
+    },
+    {
+      "ano": 2022,
+      "mes": 4,
+      "registros": 27011
+    },
+    {
+      "ano": 2022,
+      "mes": 5,
+      "registros": 26795
+    },
+    {
+      "ano": 2022,
+      "mes": 6,
+      "registros": 27148
+    },
+    {
+      "ano": 2022,
+      "mes": 7,
+      "registros": 27146
+    },
+    {
+      "ano": 2022,
+      "mes": 8,
+      "registros": 27326
+    },
+    {
+      "ano": 2022,
+      "mes": 9,
+      "registros": 27682
+    },
+    {
+      "ano": 2022,
+      "mes": 10,
+      "registros": 27683
+    },
+    {
+      "ano": 2022,
+      "mes": 11,
+      "registros": 28106
+    },
+    {
+      "ano": 2022,
+      "mes": 12,
+      "registros": 28018
+    },
+    {
+      "ano": 2023,
+      "mes": 1,
+      "registros": 28095
+    },
+    {
+      "ano": 2023,
+      "mes": 2,
+      "registros": 28214
+    },
+    {
+      "ano": 2023,
+      "mes": 3,
+      "registros": 28398
+    },
+    {
+      "ano": 2023,
+      "mes": 4,
+      "registros": 28469
+    },
+    {
+      "ano": 2023,
+      "mes": 5,
+      "registros": 7984
+    },
+    {
+      "ano": 2023,
+      "mes": 6,
+      "registros": 7913
+    },
+    {
+      "ano": 2023,
+      "mes": 7,
+      "registros": 8039
+    },
+    {
+      "ano": 2023,
+      "mes": 8,
+      "registros": 28789
+    },
+    {
+      "ano": 2023,
+      "mes": 9,
+      "registros": 23905
+    },
+    {
+      "ano": 2023,
+      "mes": 10,
+      "registros": 8188
+    },
+    {
+      "ano": 2023,
+      "mes": 11,
+      "registros": 28456
+    },
+    {
+      "ano": 2023,
+      "mes": 12,
+      "registros": 8642
+    },
+    {
+      "ano": 2024,
+      "mes": 1,
+      "registros": 22928
+    },
+    {
+      "ano": 2024,
+      "mes": 2,
+      "registros": 27270
+    },
+    {
+      "ano": 2024,
+      "mes": 3,
+      "registros": 27506
+    },
+    {
+      "ano": 2024,
+      "mes": 4,
+      "registros": 29029
+    },
+    {
+      "ano": 2024,
+      "mes": 5,
+      "registros": 5056
+    },
+    {
+      "ano": 2024,
+      "mes": 6,
+      "registros": 5354
+    },
+    {
+      "ano": 2024,
+      "mes": 7,
+      "registros": 5677
+    },
+    {
+      "ano": 2024,
+      "mes": 8,
+      "registros": 4296
+    },
+    {
+      "ano": 2024,
+      "mes": 9,
+      "registros": 4078
+    },
+    {
+      "ano": 2024,
+      "mes": 10,
+      "registros": 8176
+    },
+    {
+      "ano": 2024,
+      "mes": 11,
+      "registros": 5883
+    },
+    {
+      "ano": 2024,
+      "mes": 12,
+      "registros": 4936
+    },
+    {
+      "ano": 2025,
+      "mes": 1,
+      "registros": 5622
+    },
+    {
+      "ano": 2025,
+      "mes": 2,
+      "registros": 4873
+    },
+    {
+      "ano": 2025,
+      "mes": 3,
+      "registros": 4138
+    },
+    {
+      "ano": 2025,
+      "mes": 4,
+      "registros": 25552
+    },
+    {
+      "ano": 2025,
+      "mes": 5,
+      "registros": 25894
+    },
+    {
+      "ano": 2025,
+      "mes": 6,
+      "registros": 4308
+    },
+    {
+      "ano": 2025,
+      "mes": 7,
+      "registros": 8350
+    },
+    {
+      "ano": 2025,
+      "mes": 8,
+      "registros": 4276
+    },
+    {
+      "ano": 2025,
+      "mes": 9,
+      "registros": 4289
+    },
+    {
+      "ano": 2025,
+      "mes": 10,
+      "registros": 4332
+    }
+  ]
+}
